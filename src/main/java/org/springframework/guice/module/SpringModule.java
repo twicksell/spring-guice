@@ -58,6 +58,10 @@ public class SpringModule implements Module {
 			BeanDefinition definition = beanFactory.getBeanDefinition(name);
 			if (definition.isAutowireCandidate() && definition.getRole() == AbstractBeanDefinition.ROLE_APPLICATION) {
 				Class<?> type = beanFactory.getType(name);
+				if(type == null) 
+				{
+				    continue;
+				}
 				@SuppressWarnings("unchecked")
 				final Class<Object> cls = (Class<Object>) type;
 				final String beanName = name;
