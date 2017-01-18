@@ -23,6 +23,7 @@ import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.ConstructorArgumentValues;
+import org.springframework.beans.factory.support.AutowireCandidateQualifier;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
@@ -41,6 +42,7 @@ import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import com.google.inject.Module;
+import com.google.inject.spi.ElementSource;
 
 @Configuration
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
@@ -59,14 +61,37 @@ public class ModuleRegistryConfiguration implements BeanDefinitionRegistryPostPr
 					"spring-guice".equals(entry.getValue().getSource().toString())) {
 				continue;
 			}
-		
-			entry.getValue().getKey().toString();
+			Binding<?> binding = entry.getValue();
+			Key<?> key = entry.getKey();
+			Object source = binding.getSource();
+			
 			RootBeanDefinition bean = new RootBeanDefinition(GuiceFactoryBean.class);
 			ConstructorArgumentValues args = new ConstructorArgumentValues();
-			args.addIndexedArgumentValue(0, entry.getKey().getTypeLiteral().getRawType());
-			args.addIndexedArgumentValue(1, entry.getValue().getProvider());
+			args.addIndexedArgumentValue(0, key.getTypeLiteral().getRawType());
+			args.addIndexedArgumentValue(1, binding.getProvider());
 			bean.setConstructorArgumentValues(args);
-			registry.registerBeanDefinition(entry.getValue().getKey().toString(), bean);
+			
+			
+			if(source != null && source instanceof ElementSource) {
+			    bean.setResourceDescription(((ElementSource)source).getDeclaringSource().toString());
+			} else {
+			    bean.setResourceDescription("spring-guice");
+			}
+
+            bean.addQualifier(new AutowireCandidateQualifier("spring-guice"));
+			
+			String beanName = null;
+			if(key.getAnnotation() == null) {
+			    beanName = key.getTypeLiteral().toString();
+            } else if (com.google.inject.name.Named.class.isAssignableFrom(key.getAnnotation().annotationType())){
+                beanName = ((com.google.inject.name.Named)key.getAnnotation()).value();
+            } else if (javax.inject.Named.class.isAssignableFrom(key.getAnnotation().annotationType())){
+                beanName = ((javax.inject.Named)key.getAnnotation()).value();
+            } else {
+			    beanName = key.getAnnotation().toString();
+			}
+						
+			registry.registerBeanDefinition(beanName, bean);
 		}
 		
 		if(injector.getParent() != null)
